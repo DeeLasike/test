@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spinning Basketball - Three.js</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 100%);
+            font-family: Arial, sans-serif;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+        
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>Spinning Basketball</h3>
+        <p>Built with Three.js</p>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.setClearColor(0x87CEEB, 1);
+        document.body.appendChild(renderer.domElement);
+        
+        // Basketball geometry
+        const geometry = new THREE.SphereGeometry(2, 32, 32);
+        
+        // Create basketball material
+        const basketballMaterial = new THREE.MeshPhongMaterial({
+            color: 0xFF6600, // Orange color
+            shininess: 30,
+            specular: 0x111111
+        });
+        
+        // Create the basketball mesh
+        const basketball = new THREE.Mesh(geometry, basketballMaterial);
+        basketball.castShadow = true;
+        scene.add(basketball);
+        
+        // Add basketball lines using LineSegments
+        function createBasketballLines() {
+            const linesMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 3 });
+            const linesGeometry = new THREE.BufferGeometry();
+            const vertices = [];
+            
+            // Vertical lines
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                for (let j = 0; j <= 20; j++) {
+                    const phi = (j / 20) * Math.PI;
+                    const x = 2.01 * Math.sin(phi) * Math.cos(angle);
+                    const y = 2.01 * Math.cos(phi);
+                    const z = 2.01 * Math.sin(phi) * Math.sin(angle);
+                    vertices.push(x, y, z);
+                }
+            }
+            
+            // Horizontal lines
+            for (let i = 1; i < 20; i++) {
+                const phi = (i / 20) * Math.PI;
+                const radius = 2.01 * Math.sin(phi);
+                const y = 2.01 * Math.cos(phi);
+                
+                for (let j = 0; j <= 40; j++) {
+                    const angle = (j / 40) * Math.PI * 2;
+                    const x = radius * Math.cos(angle);
+                    const z = radius * Math.sin(angle);
+                    vertices.push(x, y, z);
+                }
+            }
+            
+            linesGeometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            
+            const lines = new THREE.Points(linesGeometry, new THREE.PointsMaterial({ 
+                color: 0x000000, 
+                size: 0.02,
+                sizeAttenuation: false 
+            }));
+            
+            scene.add(lines);
+            return lines;
+        }
+        
+        // Create basketball pattern using curves
+        function createBasketballPattern() {
+            const curveMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            const group = new THREE.Group();
+            
+            // Create curved lines for basketball pattern
+            for (let i = 0; i < 4; i++) {
+                const curve = new THREE.EllipseCurve(
+                    0, 0,
+                    2.01, 2.01,
+                    0, 2 * Math.PI,
+                    false,
+                    i * Math.PI / 2
+                );
+                
+                const points = curve.getPoints(50);
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const line = new THREE.Line(geometry, curveMaterial);
+                
+                line.rotation.x = Math.PI / 2;
+                line.rotation.z = i * Math.PI / 4;
+                group.add(line);
+            }
+            
+            // Add seam lines
+            for (let i = 0; i < 2; i++) {
+                const points = [];
+                for (let j = 0; j <= 100; j++) {
+                    const phi = (j / 100) * Math.PI;
+                    const x = 2.01 * Math.sin(phi) * Math.cos(i * Math.PI);
+                    const y = 2.01 * Math.cos(phi);
+                    const z = 2.01 * Math.sin(phi) * Math.sin(i * Math.PI);
+                    points.push(new THREE.Vector3(x, y, z));
+                }
+                
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const line = new THREE.Line(geometry, curveMaterial);
+                group.add(line);
+            }
+            
+            scene.add(group);
+            return group;
+        }
+        
+        const basketballPattern = createBasketballPattern();
+        
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 10, 5);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        scene.add(directionalLight);
+        
+        const pointLight = new THREE.PointLight(0xffffff, 0.5);
+        pointLight.position.set(-10, 10, -10);
+        scene.add(pointLight);
+        
+        // Ground plane for shadows
+        const groundGeometry = new THREE.PlaneGeometry(20, 20);
+        const groundMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x8B4513,
+            transparent: true,
+            opacity: 0.7
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -3;
+        ground.receiveShadow = true;
+        scene.add(ground);
+        
+        // Position camera
+        camera.position.set(0, 0, 8);
+        camera.lookAt(0, 0, 0);
+        
+        // Animation variables
+        let time = 0;
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            time += 0.01;
+            
+            // Rotate basketball
+            basketball.rotation.x += 0.005;
+            basketball.rotation.y += 0.01;
+            
+            // Rotate pattern with basketball
+            basketballPattern.rotation.x += 0.005;
+            basketballPattern.rotation.y += 0.01;
+            
+            // Add slight bobbing motion
+            basketball.position.y = Math.sin(time) * 0.2;
+            basketballPattern.position.y = Math.sin(time) * 0.2;
+            
+            // Camera orbit (optional - remove if you want static camera)
+            camera.position.x = Math.sin(time * 0.5) * 8;
+            camera.position.z = Math.cos(time * 0.5) * 8;
+            camera.lookAt(0, 0, 0);
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Start animation
+        animate();
+        
+        // Add mouse interaction for extra fun
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        document.addEventListener('mousemove', (event) => {
+            mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // Slightly adjust rotation based on mouse position
+            basketball.rotation.z = mouseX * 0.1;
+            basketballPattern.rotation.z = mouseX * 0.1;
+            
+            basketball.position.x = mouseX * 0.5;
+            basketballPattern.position.x = mouseX * 0.5;
+        });
+        
+        console.log("Basketball scene loaded! Move your mouse to interact with the basketball.");
+    </script>
+</body>
+</html>
