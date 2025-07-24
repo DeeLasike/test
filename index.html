@@ -47,109 +47,71 @@
         document.body.appendChild(renderer.domElement);
         
         // Basketball geometry
-        const geometry = new THREE.SphereGeometry(2, 32, 32);
-        
-        // Create basketball material
+        const geometry = new THREE.SphereGeometry(2, 64, 64);
+
+        // Load bump map for surface detail (replace 'basketball-bump.jpg' with a real bump map if available)
+        const textureLoader = new THREE.TextureLoader();
+        const bumpMap = textureLoader.load('basketball-bump.jpg');
+
+        // Create realistic basketball material
         const basketballMaterial = new THREE.MeshPhongMaterial({
-            color: 0xFF6600, // Orange color
-            shininess: 30,
-            specular: 0x111111
+            color: 0xE57227, // Realistic basketball orange
+            shininess: 40,
+            specular: 0x222222,
+            bumpMap: bumpMap,
+            bumpScale: 0.08
         });
-        
+
         // Create the basketball mesh
         const basketball = new THREE.Mesh(geometry, basketballMaterial);
         basketball.castShadow = true;
         scene.add(basketball);
+
+        // Add realistic seams using torus geometry
+        function addBasketballSeams() {
+            const seamMaterial = new THREE.MeshBasicMaterial({ color: 0x222222 });
+            const seams = new THREE.Group();
+
+            // Main seam (horizontal around equator)
+            const seam1 = new THREE.Mesh(
+                new THREE.TorusGeometry(2.01, 0.045, 16, 100),
+                seamMaterial
+            );
+            seam1.rotation.x = Math.PI / 2;
+            seams.add(seam1);
+
+            // Two vertical seams (offset from center)
+            for (let i = 0; i < 2; i++) {
+                const seam = new THREE.Mesh(
+                    new THREE.TorusGeometry(2.01, 0.045, 16, 100),
+                    seamMaterial
+                );
+                seam.rotation.y = Math.PI / 2;
+                seam.rotation.z = i * Math.PI / 2;
+                seams.add(seam);
+            }
+
+            // Two diagonal seams (slightly offset)
+            for (let i = 0; i < 2; i++) {
+                const seam = new THREE.Mesh(
+                    new THREE.TorusGeometry(2.01, 0.045, 16, 100),
+                    seamMaterial
+                );
+                seam.rotation.x = Math.PI / 4 * (i === 0 ? 1 : -1);
+                seams.add(seam);
+            }
+
+            scene.add(seams);
+            return seams;
+        }
+
+        const basketballSeams = addBasketballSeams();
         
         // Add basketball lines using LineSegments
-        function createBasketballLines() {
-            const linesMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 3 });
-            const linesGeometry = new THREE.BufferGeometry();
-            const vertices = [];
-            
-            // Vertical lines
-            for (let i = 0; i < 8; i++) {
-                const angle = (i / 8) * Math.PI * 2;
-                for (let j = 0; j <= 20; j++) {
-                    const phi = (j / 20) * Math.PI;
-                    const x = 2.01 * Math.sin(phi) * Math.cos(angle);
-                    const y = 2.01 * Math.cos(phi);
-                    const z = 2.01 * Math.sin(phi) * Math.sin(angle);
-                    vertices.push(x, y, z);
-                }
-            }
-            
-            // Horizontal lines
-            for (let i = 1; i < 20; i++) {
-                const phi = (i / 20) * Math.PI;
-                const radius = 2.01 * Math.sin(phi);
-                const y = 2.01 * Math.cos(phi);
-                
-                for (let j = 0; j <= 40; j++) {
-                    const angle = (j / 40) * Math.PI * 2;
-                    const x = radius * Math.cos(angle);
-                    const z = radius * Math.sin(angle);
-                    vertices.push(x, y, z);
-                }
-            }
-            
-            linesGeometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-            
-            const lines = new THREE.Points(linesGeometry, new THREE.PointsMaterial({ 
-                color: 0x000000, 
-                size: 0.02,
-                sizeAttenuation: false 
-            }));
-            
-            scene.add(lines);
-            return lines;
-        }
+        // Remove procedural lines and patterns since the texture will provide the look
         
         // Create basketball pattern using curves
-        function createBasketballPattern() {
-            const curveMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-            const group = new THREE.Group();
-            
-            // Create curved lines for basketball pattern
-            for (let i = 0; i < 4; i++) {
-                const curve = new THREE.EllipseCurve(
-                    0, 0,
-                    2.01, 2.01,
-                    0, 2 * Math.PI,
-                    false,
-                    i * Math.PI / 2
-                );
-                
-                const points = curve.getPoints(50);
-                const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                const line = new THREE.Line(geometry, curveMaterial);
-                
-                line.rotation.x = Math.PI / 2;
-                line.rotation.z = i * Math.PI / 4;
-                group.add(line);
-            }
-            
-            // Add seam lines
-            for (let i = 0; i < 2; i++) {
-                const points = [];
-                for (let j = 0; j <= 100; j++) {
-                    const phi = (j / 100) * Math.PI;
-                    const x = 2.01 * Math.sin(phi) * Math.cos(i * Math.PI);
-                    const y = 2.01 * Math.cos(phi);
-                    const z = 2.01 * Math.sin(phi) * Math.sin(i * Math.PI);
-                    points.push(new THREE.Vector3(x, y, z));
-                }
-                
-                const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                const line = new THREE.Line(geometry, curveMaterial);
-                group.add(line);
-            }
-            
-            scene.add(group);
-            return group;
-        }
-        
-        const basketballPattern = createBasketballPattern();
+        // Remove cartoon pattern function
         
         // Lighting
         const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
@@ -192,17 +154,15 @@
             
             time += 0.01;
             
-            // Rotate basketball
+            // Rotate basketball and seams
             basketball.rotation.x += 0.005;
             basketball.rotation.y += 0.01;
-            
-            // Rotate pattern with basketball
-            basketballPattern.rotation.x += 0.005;
-            basketballPattern.rotation.y += 0.01;
-            
+            basketballSeams.rotation.x += 0.005;
+            basketballSeams.rotation.y += 0.01;
+
             // Add slight bobbing motion
             basketball.position.y = Math.sin(time) * 0.2;
-            basketballPattern.position.y = Math.sin(time) * 0.2;
+            basketballSeams.position.y = Math.sin(time) * 0.2;
             
             // Camera orbit (optional - remove if you want static camera)
             camera.position.x = Math.sin(time * 0.5) * 8;
@@ -232,10 +192,10 @@
             
             // Slightly adjust rotation based on mouse position
             basketball.rotation.z = mouseX * 0.1;
-            basketballPattern.rotation.z = mouseX * 0.1;
-            
+            basketballSeams.rotation.z = mouseX * 0.1;
+
             basketball.position.x = mouseX * 0.5;
-            basketballPattern.position.x = mouseX * 0.5;
+            basketballSeams.position.x = mouseX * 0.5;
         });
         
         console.log("Basketball scene loaded! Move your mouse to interact with the basketball.");
